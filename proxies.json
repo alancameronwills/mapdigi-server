@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json.schemastore.org/proxies",
+  "proxies": {
+    "cssProxy": {
+      "matchCondition": {
+        "route": "/css/{*file}"
+      },
+      "backendUri": "https://deepmap.blob.core.windows.net/deepmap/css/{file}"
+    },
+    "imgProxy": {
+      "matchCondition": {
+        "route": "/img/{*file}"
+      },
+      "backendUri": "https://deepmap.blob.core.windows.net/deepmap/img/{file}"
+    },
+    "projectsProxy": {
+      "matchCondition": {
+        "route": "/projects/{*file}"
+      },
+      "backendUri": "https://deepmap.blob.core.windows.net/deepmap/projects/{file}"
+    },
+    "scriptsProxy": {
+      "matchCondition": {
+        "route": "/scripts/{*file}"
+      },
+      "backendUri": "https://deepmap.blob.core.windows.net/deepmap/scripts/{file}"
+    },
+    "htmlProxy": {
+      "matchCondition": {
+        "route": "/{file}"
+      },
+      "backendUri": "https://deepmap.blob.core.windows.net/deepmap/{file}"
+    },
+    "root": {
+      "matchCondition": {
+        "route": "/"
+      },
+      "backendUri": "https://deepmap.blob.core.windows.net/deepmap/index.html"
+    }
+  }
+}
