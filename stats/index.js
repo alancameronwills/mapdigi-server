@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 module.exports = async function (context, req) {
-    let query = req.query.query || req.body.query;
+    let query = req.query?.query || req.body?.query || "customEvents | where timestamp > ago(3d)";
     context.log(query);
     if (!query) {
         context.res = {status: 400}; 
