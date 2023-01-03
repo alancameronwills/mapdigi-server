@@ -35,19 +35,28 @@ module.exports = async function (context, req) {
         bits[kv[0]] = v;
     }
     let payload = bits.payload && JSON.parse(bits.payload) || "";
-    if (!payload || !payload.repository || !payload.head_commit) {
+    if (!payload || !payload["repository"] || !payload["commits"]) {
         context.log("Bad request");
         context.res.status="400";
         return;
     }
+    if (payload["ref"] != "refs/heads/master") {
+        context.log(`Trigger from a non-master branch: ${payload["ref"]}`);
+        return;
+    }
     context.log(`Trigger from ${payload.repository.full_name}/${payload.repository.default_branch}`);
+    // context.log(JSON.stringify(payload));
     let gitPath = `https://raw.githubusercontent.com/${payload.repository.full_name}/${payload.repository.default_branch}/`;
     // This doesn't deal with deletes. If you delete or rename an item, use 
     // Azure Storage Explorer to remove it.
-    let commit = payload.head_commit;
-    let fileNames = commit.modified.concat(commit.added);
+    let fileNameSet = {};
+    payload.commits.forEach(commit => {
+        commit.modified.forEach(item => fileNameSet[item] = 1);
+        commit.added.forEach(item => fileNameSet[item] = 1);
+    })
+    let fileNameList = Object.keys(fileNameSet);
 
-    context.log(JSON.stringify(fileNames));
+    context.log(JSON.stringify(fileNameList));
 
     let prefix = "";
     if (req.query && req.query.sub && /^\d+$/.test(req.query.sub.substr(0,1))) prefix = req.query.sub + "/";
@@ -56,9 +65,9 @@ module.exports = async function (context, req) {
     // File names are relative: e.g. index.html, img/m3.png
     let containerClient = new ContainerClient(process.env.AzureWebJobsStorage, blobContainer);
 
-    for (var i = 0; i < fileNames.length; i++) {
+    for (var i = 0; i < fileNameList.length; i++) {
         try {
-            await transferToBlob(context, containerClient, gitPath, fileNames[i], prefix);
+            await transferToBlob(context, containerClient, gitPath, fileNameList[i], prefix);
         } catch (err) { context.log(err); }
     }
     context.res = {
@@ -92,10 +101,38 @@ function decode(s) {
  */
 async function transferToBlob(context, containerClient, gitPath, name, prefix="", awaitDone=false) {
     let filePath = gitPath + name;
-    context.log(`Transfer ${name}`);
+    let contentType = mime(name);
+    context.log(`Transfer ${name}  type ${contentType}`);
     let blobClient = containerClient.getBlobClient(prefix+name);
     let poller = await blobClient.beginCopyFromURL(filePath);
     if (awaitDone) {
         await poller.pollUntilDone();
     }
+    await blobClient.setHTTPHeaders({blobContentType: contentType});
 }
+
+/** Return the mime type based on the filename extension.
+ *  Needed because mime type from git stream isn't sufficiently accurate.
+ */
+function mime(filename) {
+    try {
+        var ex = filename.match(/\.[^.]*$/)[0].toLowerCase();
+        if (ex == ".js") return "application/javascript";
+        if (ex == ".html") return "text/html";
+        if (ex == ".htm") return "text/html";
+        if (ex == ".txt") return "text/plain";
+        if (ex == ".md") return "text/markdown";
+        if (ex == ".js") return "application/javascript";
+        if (ex == ".json") return "application/json";
+        if (ex == ".css") return "text/css";
+        if (ex == ".ico") return "image/x-icon";
+        if (ex == ".pdf") return "application/pdf";
+        if (ex == ".gif") return "image/gif";
+        if (ex == ".mp3") return "audio/mpeg";
+        if (ex == ".png") return "image/png";
+        if (ex == ".jpg") return "image/jpeg";
+        if (ex == ".jpeg") return "image/jpeg";
+    } catch (e) { }
+    return "application/octet-stream";
+}
+
