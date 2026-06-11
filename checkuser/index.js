@@ -21,8 +21,11 @@ module.exports = async function (context, req) {
         idp: (req.query && req.query.idp) || req.headers["x-ms-client-principal-idp"] || (isTest ? "TestUser" : "email"),
         name: (req.query && req.query.name) || (principal.indexOf("@") < 0 ? principal : ""),
         email: (req.query && req.query.email) || (principal.indexOf("@") < 0 ? "" : principal),
-        display: (req.query && req.query.display) || "",
-        role: (req.query && req.query.role) || ""
+        display: (req.query && req.query.display) || ""
+        // SECURITY: role is deliberately NOT read from the request. Roles are
+        // set only through the userRoles function, which verifies the caller is
+        // an admin. Honouring a client-supplied role here let a brand-new user
+        // self-grant "admin" on their first sign-in (privilege escalation).
     }
     if (!input.id) {
         context.res = {body: {req:req, input:input}};
@@ -52,7 +55,7 @@ module.exports = async function (context, req) {
     if (theList.length > 0) {
         const item = theList[0];
         result["name"] = item["DisplayName"] || item["FullName"] || input.name;
-        result["role"] = item["Role"] || input.role;
+        result["role"] = item["Role"] || "";
         result["email"] = item["email"] || input.email; 
         await updateUserRow(tableClient, input, item);
     } else {
@@ -83,7 +86,7 @@ async function  createUserRow(tableClient, input) {
         FullName: input.name,
         DisplayName : input.display,
         email: input.email,
-        Role: input.role
+        Role: ""   // never trust a client-supplied role; see SECURITY note above
     };
     await tableClient.upsertEntity(entity);
 }
