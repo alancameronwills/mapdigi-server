@@ -21,11 +21,14 @@ module.exports = async function (context, req) {
         idp: (req.query && req.query.idp) || req.headers["x-ms-client-principal-idp"] || (isTest ? "TestUser" : "email"),
         name: (req.query && req.query.name) || (principal.indexOf("@") < 0 ? principal : ""),
         email: (req.query && req.query.email) || (principal.indexOf("@") < 0 ? "" : principal),
-        display: (req.query && req.query.display) || ""
-        // SECURITY: role is deliberately NOT read from the request. Roles are
-        // set only through the userRoles function, which verifies the caller is
-        // an admin. Honouring a client-supplied role here let a brand-new user
-        // self-grant "admin" on their first sign-in (privilege escalation).
+        display: (req.query && req.query.display) || "",
+        // SECURITY: only a contributor:<project> self-grant is honoured here —
+        // this is the instantContributor onboarding flow (any signed-in user
+        // becomes a contributor on such a project). Editor/admin and any other
+        // role shape are rejected; those are assigned only via the userRoles
+        // function, which verifies the caller is an admin. Without this filter
+        // a brand-new user could self-grant "admin" on first sign-in.
+        role: sanitizeRequestedRole(req.query && req.query.role)
     }
     if (!input.id) {
         context.res = {body: {req:req, input:input}};
@@ -55,7 +58,7 @@ module.exports = async function (context, req) {
     if (theList.length > 0) {
         const item = theList[0];
         result["name"] = item["DisplayName"] || item["FullName"] || input.name;
-        result["role"] = item["Role"] || "";
+        result["role"] = item["Role"] || input.role;
         result["email"] = item["email"] || input.email; 
         await updateUserRow(tableClient, input, item);
     } else {
@@ -63,6 +66,15 @@ module.exports = async function (context, req) {
     }
 
     context.res = {body: result};
+}
+
+// The only role a user may grant themselves via this endpoint is contributor
+// on a single project (the instantContributor onboarding flow). Anything else
+// — editor/admin, a bare/global role, or multiple roles — is rejected and
+// returns "". Real role changes go through the admin-gated userRoles function.
+function sanitizeRequestedRole(role) {
+    role = ("" + (role || "")).trim();
+    return /^contributor:[^;:]+$/i.test(role) ? role.toLowerCase() : "";
 }
 
 async function updateUserRow(tableClient, input, existing) {
@@ -86,7 +98,7 @@ async function  createUserRow(tableClient, input) {
         FullName: input.name,
         DisplayName : input.display,
         email: input.email,
-        Role: ""   // never trust a client-supplied role; see SECURITY note above
+        Role: input.role   // only ever "" or a validated contributor:<project>
     };
     await tableClient.upsertEntity(entity);
 }
