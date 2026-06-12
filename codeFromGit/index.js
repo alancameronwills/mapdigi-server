@@ -1,30 +1,32 @@
 /** codeFromGit - Azure Function
  * Called by a GitHub webhook when code in the map client is updated.
- * Copies the code to the blob "filestore."
- * 
- * Effect is that when you check the client code into GitHub master, 
- * it is automatically updated in the live version.
- * 
- * To use this, set up GitHub's webhook option in the client code repo.
- * Get the URL of this fn from Azure Functions control panel, as it includes a Function key.
- * Webhook monitor in GitHub shows recent calls and their success/failure.
- * 
- * This deals with additions and updates to the code. It doesn't deal with
- * deletions or renamings. After checking in such changes, 
- * use Azure Storage Explorer to the remove old files from the blob container.
+ * Copies the changed files to the blob "filestore" (the deepmap container),
+ * so checking client code into GitHub master updates the live site.
+ *
+ * To use this, set up GitHub's webhook in the client repo with the URL of this
+ * function (including its function key). The GitHub webhook monitor shows
+ * recent calls and their success/failure.
+ *
+ * Deals with additions and updates, not deletions/renames. After deleting or
+ * renaming, use Azure Storage Explorer to remove the old blob.
+ *
+ * Files are downloaded here (following redirects) and uploaded directly, rather
+ * than via beginCopyFromURL — that server-side copy was fire-and-forget and not
+ * awaited, so a slow/failed/redirected copy could silently leave a 0-byte file
+ * live. Now an empty or failed download throws, the file is skipped, and the
+ * response is a 500 listing the failures (visible in the webhook monitor).
  */
 
+const https = require("https");
+
 // Azure account key is taken from the environment variable AzureWebJobsStorage.
-// In that account, this is the blob location:
 const blobContainer = "deepmap";
 
 const { ContainerClient } = require("@azure/storage-blob");
-//const fetch = require("node-fetch");
-
 
 /** Called by the GitHub HTML webhook */
 module.exports = async function (context, req) {
-    
+
     // Decipher the hook, which is a multipart HTTP request:
     // Split into the major and subparts; somewhere in there is "payload":
     let bitsa = decodeURI(req.body).split("&");
@@ -37,7 +39,7 @@ module.exports = async function (context, req) {
     let payload = bits.payload && JSON.parse(bits.payload) || "";
     if (!payload || !payload["repository"] || !payload["commits"]) {
         context.log("Bad request");
-        context.res.status="400";
+        context.res = { status: 400, body: "Bad request" };
         return;
     }
     if (payload["ref"] != "refs/heads/master") {
@@ -45,9 +47,8 @@ module.exports = async function (context, req) {
         return;
     }
     context.log(`Trigger from ${payload.repository.full_name}/${payload.repository.default_branch}`);
-    // context.log(JSON.stringify(payload));
     let gitPath = `https://raw.githubusercontent.com/${payload.repository.full_name}/${payload.repository.default_branch}/`;
-    // This doesn't deal with deletes. If you delete or rename an item, use 
+    // This doesn't deal with deletes. If you delete or rename an item, use
     // Azure Storage Explorer to remove it.
     let fileNameSet = {};
     payload.commits.forEach(commit => {
@@ -59,35 +60,23 @@ module.exports = async function (context, req) {
     context.log(JSON.stringify(fileNameList));
 
     let prefix = "";
-    if (req.query && req.query.sub && /^\d+$/.test(req.query.sub.substr(0,1))) prefix = req.query.sub + "/";
-    //if (payload.repository.id != 191463966) prefix = "2/";
+    if (req.query && req.query.sub && /^\d+$/.test(req.query.sub.substr(0, 1))) prefix = req.query.sub + "/";
 
     // File names are relative: e.g. index.html, img/m3.png
     let containerClient = new ContainerClient(process.env.AzureWebJobsStorage, blobContainer);
 
+    let errors = [];
     for (var i = 0; i < fileNameList.length; i++) {
         try {
             await transferToBlob(context, containerClient, gitPath, fileNameList[i], prefix);
-        } catch (err) { context.log(err); }
+        } catch (err) {
+            context.log(`FAILED ${fileNameList[i]}: ${err && err.message}`);
+            errors.push(`${fileNameList[i]}: ${err && err.message}`);
+        }
     }
-    context.res = {
-        // status: 200, /* Defaults to 200 */
-        body: "ok"
-    };
-
-    /*
-    Notice that we're moving the files one at a time into the live code.
-    So for a checkin with many files:
-    (a) there is a period during the updates when the code is inconsistent, 
-    with some files updated and some not
-    (b) there's a danger that a failure half way through could leave it inconsistent
-    If doing it properly, we'd make a copy of the target blob container,
-    update the contents of the copy, and then switch the names of the containers 
-    to complete the transaction.
-    Note that the try-catch doesn't protect against a failure half way through
-    stopping the others. An exception in the child thread isn't caught by this, and 
-    will leave the await waiting for ever. The process will eventually time out.
-    */
+    context.res = errors.length
+        ? { status: 500, body: "Some files failed:\n" + errors.join("\n") }
+        : { body: "ok" };
 };
 
 function decode(s) {
@@ -95,20 +84,44 @@ function decode(s) {
 }
 
 /**
- * Copy a code file from Git to the blob 'filestore' 
- * @param {*} context - for logging
+ * Download a code file from Git and upload it to the blob. Throws if the
+ * download is empty or fails, so the caller can report it rather than
+ * publishing an empty file.
  * @param {*} name - relative file path, e.g. index.html or img/m3.png
  */
-async function transferToBlob(context, containerClient, gitPath, name, prefix="", awaitDone=false) {
-    let filePath = gitPath + name;
+async function transferToBlob(context, containerClient, gitPath, name, prefix = "") {
+    let filePath = gitPath + encodeURI(name);
     let contentType = mime(name);
     context.log(`Transfer ${name}  type ${contentType}`);
-    let blobClient = containerClient.getBlobClient(prefix+name);
-    let poller = await blobClient.beginCopyFromURL(filePath);
-    if (awaitDone) {
-        await poller.pollUntilDone();
+    let data = await fetchBuffer(filePath);
+    if (!data || data.length === 0) {
+        throw new Error(`empty download from ${filePath}`);
     }
-    await blobClient.setHTTPHeaders({blobContentType: contentType});
+    let blockBlob = containerClient.getBlockBlobClient(prefix + name);
+    await blockBlob.upload(data, data.length, { blobHTTPHeaders: { blobContentType: contentType } });
+}
+
+/** GET a URL into a Buffer, following redirects. Rejects on non-200. */
+function fetchBuffer(url, redirectsLeft = 5) {
+    return new Promise((resolve, reject) => {
+        https.get(url, res => {
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                res.resume();
+                if (redirectsLeft <= 0) { reject(new Error("too many redirects")); return; }
+                let next = new URL(res.headers.location, url).toString();
+                resolve(fetchBuffer(next, redirectsLeft - 1));
+                return;
+            }
+            if (res.statusCode !== 200) {
+                res.resume();
+                reject(new Error("status " + res.statusCode));
+                return;
+            }
+            let chunks = [];
+            res.on("data", c => chunks.push(c));
+            res.on("end", () => resolve(Buffer.concat(chunks)));
+        }).on("error", reject);
+    });
 }
 
 /** Return the mime type based on the filename extension.
@@ -122,7 +135,6 @@ function mime(filename) {
         if (ex == ".htm") return "text/html";
         if (ex == ".txt") return "text/plain";
         if (ex == ".md") return "text/markdown";
-        if (ex == ".js") return "application/javascript";
         if (ex == ".json") return "application/json";
         if (ex == ".css") return "text/css";
         if (ex == ".ico") return "image/x-icon";
@@ -135,4 +147,3 @@ function mime(filename) {
     } catch (e) { }
     return "application/octet-stream";
 }
-
