@@ -25,6 +25,15 @@
       },
       "backendUri": "https://deepmap.blob.core.windows.net/deepmap/scripts/{file}"
     },
+    "shareProxy": {
+      "matchCondition": {
+        "route": "/share/{id}"
+      },
+      "responseOverrides": {
+        "response.statusCode": "302",
+        "response.headers.Location": "/?place={id}"
+      }
+    },
     "htmlProxy": {
       "matchCondition": {
         "route": "/{file}"
