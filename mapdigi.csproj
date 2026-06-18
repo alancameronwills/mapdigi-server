@@ -93,10 +93,10 @@
     <None Update="places/index.js">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="static/function.json">
+    <None Update="zz_static/function.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="static/index.js">
+    <None Update="zz_static/index.js">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="share/function.json">

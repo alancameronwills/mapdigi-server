@@ -1,12 +1,15 @@
-/** static - Azure Function (catch-all {*path})
+/** zz_static - Azure Function (catch-all {*path})
  * Serves the static site from the "deepmap" blob container, replacing the old
  * Azure Functions Proxies (proxies.json: root/htmlProxy/cssProxy/imgProxy/
  * scriptsProxy/projectsProxy). Bytes are streamed through the host exactly as the
  * reverse-proxy did, so there is no behaviour or caching change.
  *
- * Routing: this is a {*path} catch-all. The explicit "api/..." routes on the real
- * API functions, and "share/{id}", are more specific and take precedence, so this
- * only handles everything else (/, /index.html, /css/*, /img/*, /scripts/*, ...).
+ * NAME MATTERS — do not rename to sort earlier. Azure Functions registers HTTP
+ * routes in function-name order, and a {*path} catch-all swallows every route
+ * registered AFTER it. The "zz_" prefix forces this function to load LAST, so all
+ * "api/..." and "share/{id}" routes register first and win. (When it was named
+ * "static", every function sorting after it — stats, strings, userRoles,
+ * verifyEmail, TestSendMail, … — was shadowed and 404'd.)
  *
  * The container connection comes from AzureWebJobsStorage, as in codeFromGit.
  */
