@@ -1,15 +1,15 @@
-﻿{
+{
   "bindings": [
     {
-      "authLevel": "function",
+      "authLevel": "anonymous",
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
       "methods": [
         "get",
-        "post"
+        "head"
       ],
-      "route": "api/uploadPlace"
+      "route": "{*path}"
     },
     {
       "type": "http",

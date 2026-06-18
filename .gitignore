@@ -1,2 +1,6 @@
 node_modules/**
 seed/**
+local.settings.json
+__azurite_db*.json
+__blobstorage__/**
+__queuestorage__/**
