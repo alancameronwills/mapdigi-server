@@ -15,7 +15,7 @@ module.exports = async function (context) {
         for await (const page of tableClient.listEntities().byPage({ maxPageSize: 1 })) {
             break;
         }
-        context.log("KeepWarm ok");
+        //context.log("KeepWarm ok");
     } catch (e) {
         context.log("KeepWarm error", e);
     }
