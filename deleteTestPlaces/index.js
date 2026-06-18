@@ -20,7 +20,7 @@ module.exports = async function (context, req) {
         theList.push(container);
     }
     theList.forEach(item => {
-        if (item.rowKey == "320501040707199024165") continue;
+        if (item.rowKey == "320501040707199024165") return;
         await tableClient.deleteEntity(item.partitionKey, item.rowKey);
         let media = JSON.parse(item.Media);
         media.forEach(medium => {
