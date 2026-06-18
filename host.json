@@ -3,5 +3,29 @@
   "extensionBundle": {
     "id": "Microsoft.Azure.Functions.ExtensionBundle",
     "version": "[3.*, 4.0.0)"
+  },
+  "logging": {
+    "logLevel": {
+      "default": "Information",
+      "Function": "Information",
+      "Host.Results": "Information",
+      "Host.Aggregator": "Information",
+
+      "Azure.Core": "Warning",
+      "Azure.Identity": "Warning",
+      "Azure.Storage": "Warning",
+      "Azure.Storage.Blobs": "Warning",
+      "Azure.Storage.Queues": "Warning",
+      "Host.Storage": "Warning",
+      "Microsoft.Azure.WebJobs.Host.Storage": "Warning"
+    },
+    "applicationInsights": {
+      "samplingSettings": {
+        "isEnabled": true,
+        "maxTelemetryItemsPerSecond": 5,
+        "excludedTypes": "Exception"
+      },
+      "enableLiveMetricsFilters": true
+    }
   }
 }
