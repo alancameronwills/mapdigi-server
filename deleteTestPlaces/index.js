@@ -4,10 +4,10 @@
 // https://learn.microsoft.com/en-gb/javascript/api/overview/azure/data-tables-readme?view=azure-node-latest
 
 const { TableClient, odata } = require("@azure/data-tables");
-const { BlobContainerClient } = require("@azure/storage-blob");
+const { ContainerClient } = require("@azure/storage-blob");
 
 module.exports = async function (context, req) {
-    const blobContainerClient = new BlobContainerClient(process.env.AzureWebJobsStorage, "deepmap");
+    const blobContainerClient = new ContainerClient(process.env.AzureWebJobsStorage, "deepmap");
     const tableClient = TableClient.fromConnectionString(process.env.AzureWebJobsStorage, "places");
     const queryOptions = {
         queryOptions: { filter: odata`PartitionKey eq ${process.env.TestProjectId}` }
@@ -19,14 +19,15 @@ module.exports = async function (context, req) {
     for await (const container of entities) {
         theList.push(container);
     }
-    theList.forEach(item => {
-        if (item.rowKey == "320501040707199024165") return;
+    for (const item of theList) {
+        if (item.rowKey == "320501040707199024165") continue;
         await tableClient.deleteEntity(item.partitionKey, item.rowKey);
-        let media = JSON.parse(item.Media);
-        media.forEach(medium => {
-            await blobContainerClient.DeleteBlobIfExistsAsync("media/"+medium.id, 1);
-        })
-    })
+        let media = [];
+        try { media = JSON.parse(item.Media || "[]"); } catch { }
+        for (const medium of media) {
+            await blobContainerClient.getBlockBlobClient("media/" + medium.id).deleteIfExists();
+        }
+    }
 
 
     if (req.query.partitionKey && req.query.rowKey && (req.headers["x-ms-client-principal-id"]
