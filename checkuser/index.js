@@ -73,7 +73,7 @@ module.exports = async function (context, req) {
         if (item["Role"] == "admin") {
             result["role"] = "admin";
         } else {
-            let roles = item["Role"].split(";");
+            let roles = (item["Role"] || "").split(";");
             for (let r of roles) {
                 let p = r.split(":");
                 if (project && p[1]==project) {
