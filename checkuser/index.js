@@ -22,10 +22,11 @@ module.exports = async function (context, req) {
         name: (req.query && req.query.name) || (principal.indexOf("@") < 0 ? principal : ""),
         email: (req.query && req.query.email) || (principal.indexOf("@") < 0 ? "" : principal),
         display: (req.query && req.query.display) || "",
-        // SECURITY: only a contributor:<project> self-grant is honoured here —
-        // this is the instantContributor onboarding flow (any signed-in user
-        // becomes a contributor on such a project). Editor/admin and any other
-        // role shape are rejected; those are assigned only via the userRoles
+        // SECURITY: only a contributor:<project> or viewer:<project> self-grant is honoured here.
+        // In projects with the instantContributor onboarding flow, any signed-in user
+        // becomes a contributor. On other projects, any new signed-in user becomes a viewer.
+        // Editor/admin and any other role shape are rejected; 
+        // those are assigned only via the userRoles
         // function, which verifies the caller is an admin. Without this filter
         // a brand-new user could self-grant "admin" on first sign-in.
         role: sanitizeRequestedRole(req.query && req.query.role)
@@ -68,13 +69,13 @@ module.exports = async function (context, req) {
     context.res = {body: result};
 }
 
-// The only role a user may grant themselves via this endpoint is contributor
-// on a single project (the instantContributor onboarding flow). Anything else
+// The only roles a user may grant themselves via this endpoint is contributor
+// or viewer on a single project (the instantContributor onboarding flow). Anything else
 // — editor/admin, a bare/global role, or multiple roles — is rejected and
 // returns "". Real role changes go through the admin-gated userRoles function.
 function sanitizeRequestedRole(role) {
     role = ("" + (role || "")).trim();
-    return /^contributor:[^;:]+$/i.test(role) ? role.toLowerCase() : "";
+    return /^(?:contributor|viewer):[^;:]+$/i.test(role) ? role.toLowerCase() : "";
 }
 
 async function updateUserRow(tableClient, input, existing) {
