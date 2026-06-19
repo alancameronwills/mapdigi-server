@@ -74,7 +74,7 @@ module.exports = async function (context, req) {
             result["role"] = "admin";
         } else {
             let roles = item["Role"].split(";");
-            for (let r in roles) {
+            for (let r of roles) {
                 let p = r.split(":");
                 if (project && p[1]==project) {
                     result["role"] = r;
@@ -84,7 +84,7 @@ module.exports = async function (context, req) {
         }
         let updatedRole = "";
         if (!result["role"]) {
-            result[role] = input.role; // sanitized to contributor or viewer
+            result["role"] = input.role; // sanitized to contributor or viewer
             updatedRole = input.role + ":" + project + (item["Role"] ? ";" + item["Role"]  : "") ;
         }
 
