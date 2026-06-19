@@ -9,6 +9,7 @@ const {TableClient, odata } = require("@azure/data-tables");
     * id is 3rd party credentials (x-ms-) or can be provided explicitly.
     * If not in the table but there is an id, add the new user to the table.
     * If query includes name, display name, or role, insert them in the table entry.
+    * role can only be viewer or contributor.
     * Return the req including headers, and the row in the table.
  */
 
@@ -55,15 +56,39 @@ module.exports = async function (context, req) {
         }
     }
 
+    /*
+    If the user is new, create them with the name, email and role for this project = viewer (default) or contributor.
+    If the user exists, and has a role on this project (or is superadmin), return the name, role (on this project) and email.
+    If the user exists and has no role on this project (and is not superadmin), add the requested role if contributor, and viewer otherwise;
+        return the resulting name, role on this project, and email. 
+    */
+
     let result = {entries:theList, input: input};
-    if (theList.length > 0) {
+    if (theList.length == 0) {
+        await createUserRow(tableClient, input);
+    } else {
         const item = theList[0];
         result["name"] = item["DisplayName"] || item["FullName"] || input.name;
-        result["role"] = item["Role"] || input.role;
         result["email"] = item["email"] || input.email; 
-        await updateUserRow(tableClient, input, item);
-    } else {
-        await createUserRow(tableClient, input);
+        if (item["Role"] == "admin") {
+            result["role"] = "admin";
+        } else {
+            let roles = item["Role"].split(";");
+            for (let r in roles) {
+                let p = r.split(":");
+                if (project && p[1]==project) {
+                    result["role"] = r;
+                    break;
+                }
+            }
+        }
+        let updatedRole = "";
+        if (!result["role"]) {
+            result[role] = input.role; // sanitized to contributor or viewer
+            updatedRole = input.role + ":" + project + (item["Role"] ? ";" + item["Role"]  : "") ;
+        }
+
+        await updateUserRow(tableClient, input, item, updatedRole);
     }
 
     context.res = {body: result};
@@ -78,15 +103,16 @@ function sanitizeRequestedRole(role) {
     return /^(?:contributor|viewer):[^;:]+$/i.test(role) ? role.toLowerCase() : "";
 }
 
-async function updateUserRow(tableClient, input, existing) {
+async function updateUserRow(tableClient, input, existing, updatedRole) {
     if (input.name != existing.FullName  
         || input.display != existing.DisplayName
         || input.email != existing.email
+        || updatedRole
     ) {
         if (input.name) existing.FullName = input.name;
         if (input.email) existing.email = input.email;
         if (input.display) existing.DisplayName = input.display;
-        // Don't update role - see userRoles()
+        if (updatedRole) existing.Role = updatedRole; // only ever adds contributor or viewer to this project
         await tableClient.upsertEntity(existing);
     }
 }
