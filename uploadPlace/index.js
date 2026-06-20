@@ -28,7 +28,7 @@ module.exports = async function (context, req) {
             || await callerMayContribute(principalId, partitionKey);
     }
     if (!authorized) {
-        context.log("upload denied: " + rowKey + " in " + partitionKey + ", principal " + (principalId || "(none)"));
+        context.log.warn("upload denied: " + rowKey + " in " + partitionKey + ", principal " + (principalId || "(none)"));
         context.res = { status: 403, body: "Not authorized" };
         return;
     }
@@ -42,7 +42,7 @@ module.exports = async function (context, req) {
         await tableClient.upsertEntity(entity);
         context.res = { status: 204 };
     } catch (err) {
-        context.log("upload error: " + (err && err.message));
+        context.log.error("upload error: " + (err && err.message));
         context.res = { status: 500, body: "Upload failed" };
     }
 };

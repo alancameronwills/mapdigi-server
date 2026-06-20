@@ -55,7 +55,7 @@ module.exports = async function (context, req) {
             context.res = { status: 404, body: "Not found" };
             return;
         }
-        context.log(`static: failed serving '${name}': ${err && err.message}`);
+        context.log.error(`static: failed serving '${name}': ${err && err.message}`);
         context.res = { status: 500, body: "Error" };
     }
 };

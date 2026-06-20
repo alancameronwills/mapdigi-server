@@ -19,7 +19,7 @@ module.exports = async function (context, req) {
 
     const isTest = partitionKey == process.env.TestProjectId;
     if (!isTest && !(await callerIsProjectAdmin(req, partitionKey))) {
-        context.log("delete denied: rowKey " + rowKey + ", principal " + (req.headers["x-ms-client-principal-id"] || "(none)"));
+        context.log.warn("delete denied: rowKey " + rowKey + ", principal " + (req.headers["x-ms-client-principal-id"] || "(none)"));
         context.res = { status: 403, body: "Not authorized" };
         return;
     }
@@ -29,7 +29,7 @@ module.exports = async function (context, req) {
         await tableClient.deleteEntity(partitionKey, rowKey);
         context.res = { status: 204 };
     } catch (err) {
-        context.log("delete error: " + (err && err.message));
+        context.log.error("delete error: " + (err && err.message));
         context.res = { status: 500, body: "Delete failed" };
     }
 }

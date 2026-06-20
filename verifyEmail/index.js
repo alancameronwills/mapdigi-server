@@ -52,7 +52,7 @@ module.exports = async function (context, req) {
 
 async function checkValidationKey(context, tableClient, row, token) {
     if (row.validation != token) {
-        context.log("Wrong token " + row.rowKey);
+        context.log.warn("Wrong token " + row.rowKey);
         context.res = { status: 401, body: "Wrong token" };
         return;
     }
@@ -64,7 +64,7 @@ async function checkValidationKey(context, tableClient, row, token) {
             validation:""
         });
     } catch (e) {
-        context.log("Table error: " + e);
+        context.log.error("Table error: " + e);
         context.res = { status: 250, body: "Table update error " + e };
         return;
     } 
@@ -93,7 +93,7 @@ async function setValidationKey (context, tableClient, row, email) {
             validation: token
         });
     } catch (e) {
-        context.log("Table error: " + e);
+        context.log.error("Table error: " + e);
         context.res = { status: 550, body: "Table update error " + e };
         return;
     } 

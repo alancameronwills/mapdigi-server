@@ -38,7 +38,7 @@ module.exports = async function (context, req) {
     }
     let payload = bits.payload && JSON.parse(bits.payload) || "";
     if (!payload || !payload["repository"] || !payload["commits"]) {
-        context.log("Bad request");
+        context.log.warn("Bad request");
         context.res = { status: 400, body: "Bad request" };
         return;
     }
@@ -70,7 +70,7 @@ module.exports = async function (context, req) {
         try {
             await transferToBlob(context, containerClient, gitPath, fileNameList[i], prefix);
         } catch (err) {
-            context.log(`FAILED ${fileNameList[i]}: ${err && err.message}`);
+            context.log.error(`FAILED ${fileNameList[i]}: ${err && err.message}`);
             errors.push(`${fileNameList[i]}: ${err && err.message}`);
         }
     }

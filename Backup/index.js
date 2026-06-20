@@ -25,6 +25,6 @@ async function backup(table, context) {
         const content = JSON.stringify(theList);
         await blobClient.upload(content, content.length);
     } catch (e) {
-        context.log(e);
+        context.log.error(e);
     }
 }

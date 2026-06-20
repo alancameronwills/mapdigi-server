@@ -17,6 +17,6 @@ module.exports = async function (context) {
         }
         //context.log("KeepWarm ok");
     } catch (e) {
-        context.log("KeepWarm error", e);
+        context.log.error("KeepWarm error", e);
     }
 }

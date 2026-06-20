@@ -11,9 +11,9 @@
   },
   "logging": {
     "logLevel": {
-      "default": "Information",
-      "Function": "Information",
-      "Host.Results": "Information",
+      "default": "Warning",
+      "Function": "Warning",
+      "Host.Results": "Warning",
       "Host.Aggregator": "Information",
 
       "Azure.Core": "Warning",

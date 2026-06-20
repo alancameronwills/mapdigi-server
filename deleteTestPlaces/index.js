@@ -48,6 +48,6 @@ module.exports = async function (context, req) {
             status: 400,
             body: req
         };
-        context.log("delete fail " + req.query.rowKey + ", " + req.headers["x-ms-client-principal-id"]);
+        context.log.warn("delete fail " + req.query.rowKey + ", " + req.headers["x-ms-client-principal-id"]);
     }
 }

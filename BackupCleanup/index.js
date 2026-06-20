@@ -34,6 +34,6 @@ async function containerCleanup(containerName, context) {
         }
 
     } catch (e) {
-        context.log(e);
+        context.log.error(e);
     }
 }

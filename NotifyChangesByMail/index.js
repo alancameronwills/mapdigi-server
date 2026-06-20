@@ -27,7 +27,7 @@ async function summarize(context, recipients, days, project, doViewers=false, se
         }
         if (!found) { result += `No contributions to the map in the past ${days} days.`; }
         else result += `<table>${outRows}</table>`;
-    } catch (e) { context.log("Error " + JSON.stringify(e)) }
+    } catch (e) { context.log.error("Error " + JSON.stringify(e)) }
     if (doViewers) {
         // Check viewers
         let reqbody = '{"query" : "customEvents | where timestamp > ago(7d) | summarize by user_Id '
@@ -55,8 +55,8 @@ async function summarize(context, recipients, days, project, doViewers=false, se
                         result += "<p><b>" + b.tables[0].rows.length + "</b> viewers in the past week that weren't seen in past month</p>";
                     }
                     else result += error;
-                } catch (eee) { context.log(eee); }
-            } else context.log("Error " + error);
+                } catch (eee) { context.log.error(eee); }
+            } else context.log.error("Error " + error);
 
             result += "<p><a href='https://mapdigi.org/stats.html'>Views report</a></p>";
 

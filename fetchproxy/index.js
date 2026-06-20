@@ -22,7 +22,7 @@ module.exports = async function (context, req) {
         };
 
     } catch (error) {
-        context.log("X1 " + error); context.res = { status: 400, body: "" };
+        context.log.error("X1 " + error); context.res = { status: 400, body: "" };
     }
 
     //context.res = {body:"hello"};
